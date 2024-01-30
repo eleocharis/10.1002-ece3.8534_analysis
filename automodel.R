@@ -19,20 +19,7 @@ library(MASS)
 library(lme4)
 library(lmerTest)
 
-# debugging unit
-# rm(list = ls())
-# path = "/home/jan/Uni/research_project/data"
-# setwd(path)
-# x <- read.csv(sort(list.files(path = path, pattern = "all_plot"), decreasing = T)[1], stringsAsFactors = T)
-# fm_term = "SR_herb_agg ~ DLI_cv * DLI * pH * pH_cv + (1|phyt_clust4)"
-# fm_term = "SR_herb ~ DBHcv + (1|phyt_clust4)"
-# bm_term = "SR_herb_agg ~ DLI_cv + DLI + CNratio + CNratio_cv + DLI_cv:CNratio_cv + (1|phyt_clust4)" # das ist das interssante model für H3/2
-# df = x
-# predNo=1
-# model_type = "glmer.nb"
-
-
-modeler <- function(df, fm_term = "y ~ x", model_type = "lm", predNo = 1, save = FALSE, filename = "auto") {
+modeler <- function(df, fm_term = "y ~ x", model_type = "lm", predNo = 0, save = FALSE, filename = "auto") {
   
   # define necessary variables
   fm_term_elemts <- unlist(str_split(fm_term, " "))
@@ -70,14 +57,13 @@ modeler <- function(df, fm_term = "y ~ x", model_type = "lm", predNo = 1, save =
   else if (model_type == "glmer_logn") {
     df_sc <- df %>% mutate(across(where(is.numeric), scale))  # to get positive values df_sc <- df_sc %>% mutate(across(where(is.numeric), ~ . + 10))
     df_sc[1] <- df[1]
-    fm <- glmer(fm_term, family = "gaussian"(link='log'), data = df_sc, na.action = na.fail, 
-                control = glmerControl(optimizer = "Nelder_Mead", optCtrl = list(maxfun = 10000)))}
+    fm <- glmer(fm_term, family = "gaussian"(link='log'), REML = F, data = df_sc, na.action = na.fail)}
   # print(summary(fm))
   
   # model selection
   ms <- dredge(fm, evaluate = T, rank = "AICc")
   
-  # filter the relevant variabes from the model selection. predNo = 1: 1 relevant predictor; predNo = 2: 2 relevant predictors, 0-> the very best model
+  # filter the relevant variabes in the model selection. predNo = 1: 1 relevant predictor; predNo = 2: 2 relevant predictors, 0-> the very best model
   if (predNo == 1) {bm_vars <- ms %>% filter(!is.na(get(pred1))) %>% arrange(AICc) %>% head(1)}
   else if (predNo == 2) {bm_vars <- ms %>% filter(!is.na(get(pred1)) & !is.na(get(pred2))) %>% arrange(AICc) %>% head(1)}
   else if (predNo == 0) {bm_vars <- ms %>% arrange(AICc) %>% head(1)}
@@ -106,15 +92,15 @@ modeler <- function(df, fm_term = "y ~ x", model_type = "lm", predNo = 1, save =
   else if (model_type == "glmer_logn") {
     df_sc <- df %>% mutate(across(where(is.numeric), scale))  # to get positive values df_sc <- df_sc %>% mutate(across(where(is.numeric), ~ . + 10))
     df_sc[1] <- df[1]
-    bm <- glmer(bm_term, family = "gaussian"(link='log'), data = df_sc, control = glmerControl(optimizer = "Nelder_Mead", optCtrl = list(maxfun = 10000)))}
+    bm <- glmer(bm_term, family = "gaussian"(link='log'), REML = F, data = df_sc, na.action = na.fail)}
   # report of the model
   print(bm_term)
   print(summary(bm))
   
-  # prepare data
+  # prepare output data
   data <- list()
-  data$fm_term <- fm_term
   data$bm_term <- bm_term
+  data$fm_term <- fm_term
   data$bm <- bm
   data$orig_data <- df
   data$orig_data$fitted_y <- fitted(bm) 
